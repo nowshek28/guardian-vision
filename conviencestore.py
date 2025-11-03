@@ -18,6 +18,26 @@ CUSTOMERZONE = [(1150, 0), (1920, 0), (1920, 1080), (1450, 1080)]
 input_path = os.path.join(".", "Test_video.mp4")
 model = YOLO("yolov8n-pose.pt")
 
+#--------------Firearm Danger checck model loading --------------
+# Load your trained classifier (use .pt or exported .onnx)
+cls_model = YOLO("runs/classify/train/weights/best.pt")  # or "best.onnx"
+
+IMG_SIZE = 224  # same as training
+
+def classify_hand_crop(bgr_crop: np.ndarray):
+    """
+    Returns (label, prob). Assumes BGR crop from OpenCV.
+    """
+    if bgr_crop is None or bgr_crop.size == 0:
+        return None, 0.0
+    # YOLOv8 classify can take numpy images directly
+    r = cls_model.predict(bgr_crop, imgsz=IMG_SIZE, device="cpu", verbose=False)
+    # r[0].probs: class probabilities
+    probs = r[0].probs.data.cpu().numpy()
+    idx = int(np.argmax(probs))
+    names = r[0].names  # e.g., {0:'Danger', 1:'NoDanger'}
+    return names[idx], float(probs[idx])
+
 # --- Video writer setup ---
 cap_info = cv2.VideoCapture(input_path)
 src_fps = cap_info.get(cv2.CAP_PROP_FPS) or 30.0
@@ -33,6 +53,8 @@ fourcc = cv2.VideoWriter_fourcc(*"mp4v")   # or "avc1" if supported
 out_path = os.path.join(".", "output_annotated.mp4")
 out = None  # will init after we see the first frame (to get width/height)
 
+Output_Path = "C:/Users/nowsh/AppData/Roaming/ABHISHEKS PROJECT/guardian-vision/Crop_images/"
+FRame = 0
 # ---------- Cashier registration state ----------
 FRAMES_TO_LOCK = 15     # consecutive frames in zone to lock cashier
 CONF_MIN = 0.45         # min detection confidence
@@ -43,7 +65,7 @@ in_zone_count = {}      # tid -> consecutive frames inside CASHIERZONE
 missing_frames = 0
 
 #--------------Coustmer registration state --------------
-HAND_K = 0.18       # hand box size factor relative to person height (0.12–0.18 works)
+HAND_K = 0.3      # hand box size factor relative to person height (0.12–0.18 works)
 KP_CONF_MIN = 0.40  # minimum wrist keypoint confidence
 
 # ---------- Run YOLO tracking ----------
@@ -166,12 +188,22 @@ for res in results:
 
                         # draw wrist box and dot (magenta)
                         cv2.rectangle(frame, (xA, yA), (xB, yB), (255, 0, 255), 2)
+                        #save_path = os.path.join(Output_Path, f"Frame_{FRame}_ID_{tid}_Wrist_{'L' if w_idx == L_WRIST else 'R'}.jpg")
+                        #FRame += 1
+                        #cv2.imwrite(save_path, frame[yA:yB, xA:xB])
+                        label , prob = classify_hand_crop(frame[yA:yB, xA:xB])
+                        if label == "Danger" and prob > 0.7:
+                            cv2.putText(frame, f"!! {label} {prob:.2f} !!", (xA, max(45, yA - 25)),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2, cv2.LINE_AA)
+                        else:
+                            cv2.putText(frame, f"{label} {prob:.2f}", (xA, max(45, yA - 25)),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 255), 2, cv2.LINE_AA)
                         cv2.circle(frame, (int(wx), int(wy)), 3, (255, 0, 255), -1)
 
                         # small label
                         hand_label = "L-hand" if w_idx == L_WRIST else "R-hand"
-                        cv2.putText(frame, hand_label, (xA, max(15, yA - 6)),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1, cv2.LINE_AA)
+                        #cv2.putText(frame, hand_label, (xA, max(15, yA - 6)),
+                                    #cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1, cv2.LINE_AA)
 
     # lazy-init writer with the first frame's size
     if out is None:
