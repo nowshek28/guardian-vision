@@ -53,7 +53,7 @@ fourcc = cv2.VideoWriter_fourcc(*"mp4v")   # or "avc1" if supported
 out_path = os.path.join(".", "output_annotated.mp4")
 out = None  # will init after we see the first frame (to get width/height)
 
-Output_Path = "C:/Users/nowsh/AppData/Roaming/ABHISHEKS PROJECT/guardian-vision/Crop_images/"
+Output_Path = ""    #output path
 FRame = 0
 # ---------- Cashier registration state ----------
 FRAMES_TO_LOCK = 15     # consecutive frames in zone to lock cashier
